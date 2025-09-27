@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AuthState, User } from '@/types';
 import { apiClient } from '@/lib/api';
+import toast from 'react-hot-toast';
+
 
 interface AuthActions {
   login: (email: string, password: string) => Promise<boolean>;
@@ -53,7 +55,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             return false;
           }
         } catch (error) {
-          console.error('Login failed:', error);
+          console.log('Login failed:', error);
+          toast.error('Login failed');
           set({ isLoading: false });
           return false;
         }
@@ -89,7 +92,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             return false;
           }
         } catch (error) {
-          console.error('Registration failed:', error);
+          console.log('Registration failed:', error);
+          toast.error('Registration failed');
           set({ isLoading: false });
           return false;
         }
@@ -99,7 +103,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         try {
           await apiClient.logout();
         } catch (error) {
-          console.error('Logout API call failed:', error);
+          console.log('Logout API call failed:', error);
+          toast.error('Logout failed');
         } finally {
           set({
             user: null,
@@ -162,7 +167,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             set({ isLoading: false });
           }
         } catch (error) {
-          console.error('Auth check failed:', error);
+          console.log('Auth check failed:', error);
+          toast.error('Authentication check failed');
           apiClient.clearToken();
           set({
             user: null,
@@ -191,7 +197,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           
           return false;
         } catch (error) {
-          console.error('Profile update failed:', error);
+          console.log('Profile update failed:', error);
+          toast.error('Profile update failed');
           return false;
         }
       },
@@ -206,7 +213,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           
           return response.success;
         } catch (error) {
-          console.error('Password change failed:', error);
+          console.log('Password change failed:', error);
+          toast.error('Password change failed');
           return false;
         }
       },
