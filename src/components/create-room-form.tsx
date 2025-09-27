@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Users, Lock, Unlock } from 'lucide-react';
 import { useRoom } from '@/hooks/use-room';
-import { isValidRoomName, generateRoomId, cn } from '@/utils/common';
+import { isValidRoomName, cn } from '@/utils/common';
 
 interface CreateRoomFormProps {
   className?: string;
@@ -29,9 +29,9 @@ export function CreateRoomForm({
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = 'Room name is required';
+      newErrors.name = 'Meeting agenda is required';
     } else if (!isValidRoomName(formData.name)) {
-      newErrors.name = 'Room name must be between 3 and 50 characters';
+      newErrors.name = 'Meeting agenda must be between 3 and 50 characters';
     }
 
     if (formData.maxParticipants < 2 || formData.maxParticipants > 100) {
@@ -53,7 +53,8 @@ export function CreateRoomForm({
     }
   };
 
-  const handleInputChange = (field: keyof typeof formData, value: any) => {
+  const handleInputChange = (field: keyof typeof formData, value: unknown) => {
+    if (value && field === 'maxParticipants' && (value as number) > 100) return;  
     setFormData(prev => ({ ...prev, [field]: value }));
     
     // Clear field-specific error when user starts typing
@@ -62,6 +63,16 @@ export function CreateRoomForm({
     }
   };
 
+  const numberInputOnWheelPreventChange = (e: React.WheelEvent<HTMLInputElement>) => {
+    (e.target as HTMLInputElement).blur()
+
+    e.stopPropagation()
+
+    setTimeout(() => {
+        (e.target as HTMLInputElement).focus()
+    }, 0)
+  }
+
   return (
     <div className={cn(
       'w-full max-w-md rounded-lg bg-white p-6 shadow-lg',
@@ -69,10 +80,10 @@ export function CreateRoomForm({
     )}>
       <div className="mb-6">
         <h2 className="text-xl font-bold text-gray-900 mb-2">
-          Create New Room
+          Create New Meeting
         </h2>
         <p className="text-gray-600">
-          Set up a new video call room and invite others to join
+          Set up a new video call and invite others to join
         </p>
       </div>
 
@@ -83,7 +94,7 @@ export function CreateRoomForm({
             htmlFor="roomName" 
             className="block text-sm font-medium text-gray-700 mb-1"
           >
-            Room Name
+            Meeting Agenda
           </label>
           <input
             id="roomName"
@@ -94,7 +105,7 @@ export function CreateRoomForm({
               'w-full rounded-lg border px-3 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500',
               errors.name ? 'border-red-500' : 'border-gray-300'
             )}
-            placeholder="Enter room name"
+            placeholder="Enter meeting agenda"
             disabled={isCreating}
           />
           {errors.name && (
@@ -117,7 +128,7 @@ export function CreateRoomForm({
             >
               <Unlock className="h-5 w-5 text-green-600 mr-3" />
               <div>
-                <div className="font-medium text-gray-900">Public Room</div>
+                <div className="font-medium text-gray-900">Public Meet</div>
                 <div className="text-sm text-gray-600">
                   Anyone with the link can join
                 </div>
@@ -133,7 +144,7 @@ export function CreateRoomForm({
             >
               <Lock className="h-5 w-5 text-orange-600 mr-3" />
               <div>
-                <div className="font-medium text-gray-900">Private Room</div>
+                <div className="font-medium text-gray-900">Private Meet</div>
                 <div className="text-sm text-gray-600">
                   Only invited users can join
                 </div>
@@ -157,8 +168,9 @@ export function CreateRoomForm({
               type="number"
               min="2"
               max="100"
+              onWheel={numberInputOnWheelPreventChange}
               value={formData.maxParticipants}
-              onChange={(e) => handleInputChange('maxParticipants', parseInt(e.target.value) || 10)}
+              onChange={(e) => handleInputChange('maxParticipants', parseInt(e.target.value) || e.target.value)}
               className={cn(
                 'w-full rounded-lg border px-10 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500',
                 errors.maxParticipants ? 'border-red-500' : 'border-gray-300'

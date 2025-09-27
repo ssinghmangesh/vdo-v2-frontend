@@ -1,5 +1,7 @@
 // API client for backend communication
 
+import toast from "react-hot-toast";
+
 interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
@@ -118,7 +120,7 @@ export class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}`);
+        toast.error(data.message || `HTTP ${response.status}`);
       }
 
       return data;

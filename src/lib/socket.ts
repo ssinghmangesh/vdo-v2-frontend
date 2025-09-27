@@ -42,7 +42,7 @@ class SocketService {
    */
   joinRoom(roomId: string, user: User): void {
     if (this.socket) {
-      this.socket.emit('join-room', { roomId, user });
+      this.socket.emit('room:join', { roomId, user });
     }
   }
 
@@ -60,7 +60,7 @@ class SocketService {
    */
   createRoom(room: Omit<Room, 'id' | 'createdAt'>): void {
     if (this.socket) {
-      this.socket.emit('create-room', room);
+      this.socket.emit('room:join', room);
     }
   }
 

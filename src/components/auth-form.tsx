@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
-import { generateUserId, isValidEmail } from '@/utils/common';
+import { isValidEmail } from '@/utils/common';
 import { cn } from '@/utils/common';
-import type { User } from '@/types';
+import toast from 'react-hot-toast';
 
 interface AuthFormProps {
   className?: string;
@@ -66,11 +66,13 @@ export function AuthForm({ className, redirectTo = '/' }: AuthFormProps) {
 
       if (success) {
         router.push(redirectTo);
+        toast.success('Authentication successful');
       } else {
         setErrors({ submit: 'Authentication failed. Please check your credentials and try again.' });
       }
     } catch (error) {
-      console.error('Authentication error:', error);
+      console.log('Authentication error:', error);
+      toast.error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setErrors({ submit: 'Authentication failed. Please try again.' });
     } finally {
       setIsLoading(false);
