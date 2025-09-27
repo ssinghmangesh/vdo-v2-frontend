@@ -1,6 +1,6 @@
 // API client for backend communication
 
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;
@@ -93,15 +93,15 @@ export class ApiClient {
     }
   }
 
-  private async request<T = any>(
+  private async request<T = unknown>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}/api${endpoint}`;
     
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     // Add authorization header if token exists
@@ -262,7 +262,19 @@ export class ApiClient {
     }
 
     const endpoint = `/video-calls${searchParams.toString() ? `?${searchParams}` : ''}`;
-    return this.request<VideoCall[]>(endpoint);
+    const response = await this.request<VideoCall[]>(endpoint);
+    
+    // Transform the response to match PaginatedResponse structure
+    return {
+      ...response,
+      data: response.data || [],
+      pagination: {
+        page: 1,
+        limit: 10,
+        total: (response.data || []).length,
+        pages: 1,
+      },
+    } as PaginatedResponse<VideoCall>;
   }
 
   async getCall(id: string): Promise<ApiResponse<VideoCall>> {
@@ -310,12 +322,12 @@ export class ApiClient {
     });
   }
 
-  async getCallStats(id: string): Promise<ApiResponse<any>> {
+  async getCallStats(id: string): Promise<ApiResponse<Record<string, unknown>>> {
     return this.request(`/video-calls/${id}/stats`);
   }
 
   // Health check
-  async healthCheck(): Promise<ApiResponse<any>> {
+  async healthCheck(): Promise<ApiResponse<Record<string, unknown>>> {
     return this.request('/health');
   }
 

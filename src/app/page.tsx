@@ -14,7 +14,7 @@ export default function Home() {
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [joinRoomId, setJoinRoomId] = useState('');
   const [isJoining, setIsJoining] = useState(false);
-  const { isAuthenticated, user, checkAuth } = useAuthStore();
+  const { isAuthenticated, checkAuth } = useAuthStore();
 
   // Check authentication on app load
   useEffect(() => {
@@ -117,14 +117,13 @@ export default function Home() {
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center">
                 <Video className="h-8 w-8 text-blue-600 mr-3" />
-                <h1 className="text-xl font-bold text-gray-900">VideoCall</h1>
+                <h1 className="text-xl font-bold text-gray-900">VDO</h1>
               </div>
               
               <div className="flex items-center space-x-4">
-                <span className="text-gray-600">Welcome, {user?.name}</span>
                 <button 
                   onClick={() => useAuthStore.getState().logout()}
-                  className="text-gray-600 hover:text-gray-900"
+                  className="text-red-600 cursor-pointer hover:text-gray-900"
                 >
                   Sign out
                 </button>
@@ -137,7 +136,7 @@ export default function Home() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Start your video call
+              Start your meeting
             </h2>
             <p className="text-xl text-gray-600">
               Create a new room or join an existing one

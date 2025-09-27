@@ -77,7 +77,7 @@ export default function RoomPage() {
             Unable to join room
           </h2>
           <p className="text-gray-300 mb-6">
-            The room "{roomId}" might not exist or you don't have permission to join it.
+            The room &quot;{roomId}&quot; might not exist or you don&apos;t have permission to join it.
           </p>
           <div className="space-y-3">
             <button
@@ -98,18 +98,15 @@ export default function RoomPage() {
     );
   }
 
+  console.log("currentRoom?.participants", currentRoom);
+
   return (
     <div className="h-screen flex flex-col bg-gray-900">
       {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-lg font-semibold text-white">
-              {currentRoom?.name || `Room ${roomId}`}
-            </h1>
-            <span className="text-sm text-gray-400">
-              {currentRoom?.participants.length || 0} participant{(currentRoom?.participants.length || 0) !== 1 ? 's' : ''}
-            </span>
+            <h1 className="text-lg font-semibold text-white">VDO</h1>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -212,7 +209,7 @@ export default function RoomPage() {
                 type="text"
                 value={getRoomShareUrl()}
                 readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-black"
               />
             </div>
             
@@ -231,64 +228,6 @@ export default function RoomPage() {
               <button
                 onClick={() => setShowShareModal(false)}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Settings
-              </h3>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium text-gray-900 mb-2">Audio & Video</h4>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input type="checkbox" className="mr-2" />
-                    <span className="text-gray-700">Noise Cancellation</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="checkbox" className="mr-2" />
-                    <span className="text-gray-700">Background Blur</span>
-                  </label>
-                </div>
-              </div>
-              
-              <div>
-                <h4 className="font-medium text-gray-900 mb-2">Room Settings</h4>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input type="checkbox" className="mr-2" />
-                    <span className="text-gray-700">Mute participants on join</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="checkbox" className="mr-2" />
-                    <span className="text-gray-700">Enable waiting room</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setShowSettings(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Close
               </button>

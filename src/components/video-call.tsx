@@ -178,30 +178,6 @@ export function VideoCall({
             </button>
           </div>
         )}
-
-        {/* Call Info */}
-        <div className="absolute left-4 top-4">
-          <div className="rounded-lg bg-black/50 px-3 py-2 text-sm text-white">
-            <div>{currentRoom?.name}</div>
-            <div className="text-xs text-gray-300">
-              {peersCount + 1} participant{peersCount !== 0 ? 's' : ''}
-            </div>
-          </div>
-        </div>
-
-        {/* No other participants message */}
-        {!hasRemotePeers && (
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center">
-            <div className="mx-auto max-w-md rounded-lg bg-black/50 p-6 text-white">
-              <h3 className="mb-2 text-lg font-semibold">
-                Waiting for others to join
-              </h3>
-              <p className="text-sm text-gray-300">
-                Share the room link with others to start your video call
-              </p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Call Controls */}
