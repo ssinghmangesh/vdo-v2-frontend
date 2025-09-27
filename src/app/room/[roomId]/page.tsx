@@ -1,0 +1,301 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useAuthStore } from '@/store/auth-store';
+import { useRoom } from '@/hooks/use-room';
+import { VideoCall } from '@/components/video-call';
+import { copyToClipboard } from '@/utils/common';
+import { Share, Users, MessageCircle, Settings, X } from 'lucide-react';
+
+export default function RoomPage() {
+  const router = useRouter();
+  const params = useParams();
+  const roomId = params.roomId as string;
+  
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  
+  const { isAuthenticated, user } = useAuthStore();
+  const { currentRoom, joinRoom, isJoining, getRoomShareUrl } = useRoom();
+
+  // Redirect to auth if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push(`/?room=${roomId}`);
+      return;
+    }
+
+    // Join room automatically if not already in it
+    if (!currentRoom && roomId) {
+      joinRoom(roomId);
+    }
+  }, [isAuthenticated, currentRoom, roomId, router, joinRoom]);
+
+  // Handle room sharing
+  const handleShareRoom = async () => {
+    const shareUrl = getRoomShareUrl();
+    const success = await copyToClipboard(shareUrl);
+    setCopySuccess(success);
+    
+    if (success) {
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
+  };
+
+  // Show loading state
+  if (!isAuthenticated || isJoining) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-900">
+        <div className="text-center">
+          <div className="mb-4 h-16 w-16 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mx-auto"></div>
+          <h2 className="text-xl font-semibold text-white mb-2">
+            {!isAuthenticated ? 'Redirecting to login...' : 'Joining room...'}
+          </h2>
+          <p className="text-gray-300">
+            {!isAuthenticated 
+              ? 'Please wait while we redirect you to authenticate' 
+              : 'Setting up your connection'
+            }
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if room join failed
+  if (!currentRoom && !isJoining) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-900">
+        <div className="max-w-md text-center">
+          <div className="mb-4 text-6xl">🚫</div>
+          <h2 className="text-2xl font-bold text-white mb-4">
+            Unable to join room
+          </h2>
+          <p className="text-gray-300 mb-6">
+            The room "{roomId}" might not exist or you don't have permission to join it.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={() => joinRoom(roomId)}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => router.push('/')}
+              className="w-full border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Go Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-gray-900">
+      {/* Header */}
+      <header className="bg-gray-800 border-b border-gray-700 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <h1 className="text-lg font-semibold text-white">
+              {currentRoom?.name || `Room ${roomId}`}
+            </h1>
+            <span className="text-sm text-gray-400">
+              {currentRoom?.participants.length || 0} participant{(currentRoom?.participants.length || 0) !== 1 ? 's' : ''}
+            </span>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="flex items-center space-x-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Share className="h-4 w-4" />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+            
+            <button
+              onClick={() => setShowParticipants(!showParticipants)}
+              className="flex items-center space-x-2 bg-gray-700 text-white px-3 py-1.5 rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">
+                {currentRoom?.participants.length || 0}
+              </span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 flex relative">
+        {/* Video Call Area */}
+        <div className={`flex-1 ${showParticipants ? 'mr-80' : ''}`}>
+          <VideoCall
+            className="h-full"
+            onSettingsClick={() => setShowSettings(true)}
+            onParticipantsClick={() => setShowParticipants(true)}
+            onChatClick={() => setShowChat(true)}
+          />
+        </div>
+
+        {/* Participants Sidebar */}
+        {showParticipants && (
+          <div className="absolute right-0 top-0 bottom-0 w-80 bg-gray-800 border-l border-gray-700 z-10">
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <h3 className="text-lg font-semibold text-white">Participants</h3>
+              <button
+                onClick={() => setShowParticipants(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-3">
+              {currentRoom?.participants.map((participant) => (
+                <div
+                  key={participant.id}
+                  className="flex items-center space-x-3 p-2 bg-gray-700 rounded-lg"
+                >
+                  <div className="h-8 w-8 bg-blue-600 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-semibold text-white">
+                      {participant.name?.charAt(0).toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-white font-medium">
+                      {participant.name}
+                      {participant.id === user?.id && ' (You)'}
+                      {participant.id === currentRoom?.hostId && ' (Host)'}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {participant.email}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Share Room
+              </h3>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <p className="text-gray-600 mb-4">
+              Share this link with others to invite them to the room:
+            </p>
+            
+            <div className="mb-4">
+              <input
+                type="text"
+                value={getRoomShareUrl()}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+              />
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={handleShareRoom}
+                className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+                  copySuccess
+                    ? 'bg-green-600 text-white'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {copySuccess ? 'Copied!' : 'Copy Link'}
+              </button>
+              
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Settings
+              </h3>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Audio & Video</h4>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-2" />
+                    <span className="text-gray-700">Noise Cancellation</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-2" />
+                    <span className="text-gray-700">Background Blur</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Room Settings</h4>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-2" />
+                    <span className="text-gray-700">Mute participants on join</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="checkbox" className="mr-2" />
+                    <span className="text-gray-700">Enable waiting room</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
