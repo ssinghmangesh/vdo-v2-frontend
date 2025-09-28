@@ -16,7 +16,7 @@ const CreateMeeting = () => {
             ariaHideApp={false}
             preventScroll={true}
         >
-            <CreateRoomForm onCancel={() => setShowCreateRoom(false)} onSuccess={() => setShowCreateRoom(false)} />
+            <CreateRoomForm onCancel={() => setShowCreateRoom(false)} />
         </ReactModal>
         <div className="bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow">
         <div className="text-center">

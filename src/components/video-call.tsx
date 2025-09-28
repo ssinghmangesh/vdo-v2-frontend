@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useCallStore } from '@/store/call-store';
 import { useRoomStore } from '@/store/room-store';
 import { useMedia } from '@/hooks/use-media';
-import { usePeer } from '@/hooks/use-peer';
+import { useWebRTC } from '@/hooks/use-webrtc';
+import { useAuthStore } from '@/store/auth-store';
 import { LocalVideo } from './local-video';
 import { RemoteVideo } from './remote-video';
 import { CallControls } from './call-controls';
 import { cn } from '@/utils/common';
+// import type { CallSettings } from '@/types'; // Available for future use
 
 interface VideoCallProps {
   className?: string;
@@ -17,51 +18,126 @@ interface VideoCallProps {
   onChatClick?: () => void;
 }
 
+// Default call settings available for future use
+// const defaultCallSettings: CallSettings = {
+//   videoEnabled: true,
+//   audioEnabled: true,
+//   screenShareEnabled: false,
+//   backgroundBlurEnabled: false,
+//   noiseReductionEnabled: true,
+// };
+
 export function VideoCall({
   className,
   onSettingsClick,
   onParticipantsClick,
   onChatClick,
 }: VideoCallProps) {
+  // Local state for call functionality
   const [isInitialized, setIsInitialized] = useState(false);
   const [layoutMode, setLayoutMode] = useState<'grid' | 'spotlight'>('grid');
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [callError, setCallError] = useState<string | null>(null);
   
-  const { 
-    localStream, 
-    peers, 
-    isInCall, 
-    isConnecting, 
-    error,
-    setCallState 
-  } = useCallStore();
-  
-  const { currentRoom } = useRoomStore();
+  // Store references
+  const { currentRoom, error: roomError } = useRoomStore();
+  const { user: currentUser } = useAuthStore();
   const { initializeMedia, error: mediaError } = useMedia();
-  const { peersCount } = usePeer();
+  const { 
+    peers, 
+    isConnecting: webrtcConnecting, 
+    setLocalStream: setWebRTCLocalStream,
+    connectToAllParticipants,
+  } = useWebRTC();
+  
+  const error = callError || roomError;
+  const isConnecting = webrtcConnecting;
 
   // Initialize media when component mounts
   useEffect(() => {
     const initCall = async () => {
-      if (!isInitialized && currentRoom) {
+      if (!isInitialized && currentRoom && currentUser) {
         try {
-          setCallState(false, true); // Set connecting state
-          await initializeMedia();
-          setCallState(true, false); // Set in call state
-          setIsInitialized(true);
+          setCallError(null);
+          console.log('🎥 Initializing video call for room:', currentRoom.id);
+          
+          const stream = await initializeMedia();
+          if (stream) {
+            console.log('🎥 Received stream from initializeMedia:', !!stream);
+            console.log('🎥 Stream tracks:', stream.getTracks().map(t => `${t.kind}: ${t.enabled}`));
+            
+            setLocalStream(stream);
+            setWebRTCLocalStream(stream);
+            setIsInitialized(true);
+            
+            console.log('✅ Media initialized successfully, local stream set');
+          } else {
+            throw new Error('Failed to initialize media stream');
+          }
+          
         } catch (error) {
           console.error('Failed to initialize call:', error);
-          setCallState(false, false);
+          setCallError(error instanceof Error ? error.message : 'Failed to initialize call');
         }
       }
     };
 
     initCall();
-  }, [currentRoom, isInitialized, initializeMedia, setCallState]);
+  }, [currentRoom, currentUser, isInitialized, initializeMedia, setWebRTCLocalStream]);
+
+  // Connect to other participants when room participants change
+  useEffect(() => {
+    if (isInitialized && currentRoom && currentUser && localStream) {
+      console.log('🌐 Room participants updated, connecting to peers...');
+      console.log('🌐 Current room participants:', currentRoom.participants.length);
+      console.log('🌐 Current user:', currentUser.id);
+      console.log('🌐 Local stream available:', !!localStream);
+      
+      // Small delay to ensure all participants are properly loaded
+      const timer = setTimeout(() => {
+        connectToAllParticipants();
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [
+    isInitialized, 
+    currentRoom, 
+    currentUser, 
+    localStream, 
+    connectToAllParticipants
+  ]);
 
   // Handle volume toggle for remote videos
   const handleVolumeToggle = useCallback((peerId: string, muted: boolean) => {
     console.log(`${muted ? 'Muted' : 'Unmuted'} peer:`, peerId);
   }, []);
+
+  // Update call settings (Available for future use)
+  // const updateCallSettings = useCallback((settings: Partial<CallSettings>) => {
+  //   // Apply settings to local stream
+  //   if (localStream) {
+  //     const videoTrack = localStream.getVideoTracks()[0];
+  //     const audioTrack = localStream.getAudioTracks()[0];
+  //     
+  //     if (videoTrack && settings.videoEnabled !== undefined) {
+  //       videoTrack.enabled = settings.videoEnabled;
+  //     }
+  //     if (audioTrack && settings.audioEnabled !== undefined) {
+  //       audioTrack.enabled = settings.audioEnabled;
+  //     }
+  //   }
+  // }, [localStream]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clean up local stream
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [localStream]);
 
   // Calculate grid layout
   const getGridLayoutClass = () => {
@@ -144,6 +220,9 @@ export function VideoCall({
                 'h-full min-h-[200px]',
                 layoutMode === 'spotlight' && hasRemotePeers && 'h-32'
               )}
+              stream={localStream}
+              videoEnabled={true}
+              audioEnabled={true}
             />
           )}
 
@@ -163,7 +242,12 @@ export function VideoCall({
         {/* Local Video in Spotlight Mode (Small) */}
         {layoutMode === 'spotlight' && hasRemotePeers && (
           <div className="absolute bottom-24 right-4 w-48">
-            <LocalVideo className="h-32" />
+            <LocalVideo 
+              className="h-32" 
+              stream={localStream}
+              videoEnabled={true}
+              audioEnabled={true}
+            />
           </div>
         )}
 
@@ -178,6 +262,19 @@ export function VideoCall({
             </button>
           </div>
         )}
+      </div>
+
+      {/* Debug Info */}
+      <div className="absolute left-4 top-4 rounded bg-black/50 p-2 text-xs text-white">
+        <div>Local Stream: {localStream ? '✅' : '❌'}</div>
+        <div>Peers: {Object.keys(peers).length}</div>
+        <div>Initialized: {isInitialized ? '✅' : '❌'}</div>
+        <div>Connecting: {isConnecting ? '🔄' : '✅'}</div>
+        {Object.entries(peers).map(([peerId, peer]) => (
+          <div key={peerId}>
+            {peerId}: {peer.stream ? '📹' : '❌'}
+          </div>
+        ))}
       </div>
 
       {/* Call Controls */}

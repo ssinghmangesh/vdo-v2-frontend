@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRoomStore } from '@/store/room-store';
 import { useAuthStore } from '@/store/auth-store';
 import { useCallStore } from '@/store/call-store';
 import { socketService } from '@/lib/socket';
 import { generateRoomId } from '@/utils/common';
-import type { Room, User } from '@/types';
+import type { Participant, Room, RoomUserJoined, SocketEvents, User, WebRTCSignal } from '@/types';
 
 export function useRoom() {
   const router = useRouter();
@@ -16,18 +16,89 @@ export function useRoom() {
     currentRoom,
     setCurrentRoom,
     updateRoom,
-    addParticipant,
-    removeParticipant,
-    setLoading,
     setError,
     leaveRoom: leaveRoomStore,
+    isLoading,
+    setIsLoading
   } = useRoomStore();
   
   const { user: currentUser } = useAuthStore();
   const { setHost, resetCall } = useCallStore();
 
+  const socketEventHandlers: SocketEvents = useMemo(() => ({
+    'user-joined': (user: User) => {
+      console.log('✅ User joined:', user);
+    },
+    'user-left': (userId: string) => {
+      console.log('✅ User left:', userId);
+    },
+    'receive-call': (data: { signal: WebRTCSignal; from: string; user: User }) => {
+      console.log('✅ Receive call:', data);
+    },
+    'call-accepted': (data: { signal: WebRTCSignal; from: string }) => {
+      console.log('✅ Call accepted:', data);
+    },
+    'call-ended': () => {
+      console.log('✅ Call ended');
+    },
+    'room-update': (room: Room) => {
+      console.log('✅ Room updated:', room);
+    },
+    'room:created': (room: Room) => {
+      console.log('✅ Room created:', room);
+    },
+    'participant-kicked': (participantId: string) => {
+      console.log('✅ Participant kicked:', participantId);
+    },
+    'host-transferred': (data: { newHostId: string; newHost: User }) => {
+      console.log('✅ Host transferred:', data);
+    },
+    'room:joined': (room: Room) => {
+      console.log('✅ Room joined successfully:', room);
+      updateRoom(room);
+    },
+    'error': (error: { message: string; code?: string }) => {
+      console.error('❌ Error:', error);
+    },
+    'room:user-joined': (room: RoomUserJoined) => {
+      console.log('✅ Room user joined:', room);
+      // Convert to Participant[] when needed
+      if (currentRoom) {
+        // Convert existing participants to Participant type if they're Users
+        const convertedParticipants: Participant[] = currentRoom.participants.map(p => {
+          if ('userId' in p) {
+            // Already a Participant
+            return p as Participant;
+          } else {
+            // Convert User to Participant
+            return {
+              peerId: `peer_${p.id}`,
+              userId: p.id,
+              user: p as User,
+              mediaState: {
+                videoEnabled: true,
+                audioEnabled: true,
+                screenShareEnabled: false,
+              },
+              isConnected: true,
+              joinedAt: new Date(),
+            } as Participant;
+          }
+        });
+        
+        // Filter out the user that's joining and add the new participant
+        const filteredParticipants = convertedParticipants.filter(p => p.userId !== room.user.id);
+        updateRoom({ participants: [...filteredParticipants, room.participant] });
+      }
+    }
+  }), [currentRoom, updateRoom]);
+
+  const connectSocket = useCallback(() => {
+    return socketService.connect(process.env.NEXT_PUBLIC_SOCKET_URL, socketEventHandlers);
+  }, [socketEventHandlers]);
+
   /**
-   * Create a new room
+   * Create a new room with auto-redirect
    */
   const createRoom = useCallback(
     async (roomData: {
@@ -56,24 +127,17 @@ export function useRoom() {
         };
 
         // Connect to socket if not already connected
-        const socket = socketService.connect();
+        const socket = connectSocket();
         if (!socket.connected) {
-          await new Promise((resolve) => {
-            socket.once('connect', resolve);
+          await new Promise<void>((resolve) => {
+            socket.once('connect', () => resolve());
           });
         }
 
+        setIsLoading(true);
+
         // Create room on server
         socketService.createRoom(newRoom);
-        
-        // Set local room state
-        setCurrentRoom(newRoom);
-        setHost(true);
-
-        // Navigate to room
-        router.push(`/room/${roomId}`);
-
-        return newRoom;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Failed to create room';
         setError(errorMsg);
@@ -82,7 +146,122 @@ export function useRoom() {
         setIsCreating(false);
       }
     },
-    [currentUser, setCurrentRoom, setHost, setError, router]
+    [currentUser, setError, setIsLoading, connectSocket]
+  );
+
+  /**
+   * Create a new room and return URL for sharing (no auto-redirect)
+   */
+  const createRoomWithUrl = useCallback(
+    async (roomData: {
+      name: string;
+      isPrivate?: boolean;
+      maxParticipants?: number;
+    }) => {
+      if (!currentUser) {
+        setError('User not authenticated');
+        return null;
+      }
+
+      setIsCreating(true);
+      setError(null);
+
+      try {
+        const roomId = generateRoomId();
+        const newRoom: Room = {
+          id: roomId,
+          name: roomData.name,
+          participants: [currentUser],
+          createdAt: new Date(),
+          hostId: currentUser.id,
+          isPrivate: roomData.isPrivate || false,
+          maxParticipants: roomData.maxParticipants,
+          status: 'scheduled'
+        };
+
+        // Connect to socket if not already connected
+        const socket = connectSocket();
+        if (!socket.connected) {
+          console.log('⏳ Waiting for socket connection...');
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error('Socket connection timeout'));
+            }, 10000);
+
+            socket.once('connect', () => {
+              clearTimeout(timeout);
+              console.log('✅ Socket connected, proceeding with room creation');
+              resolve();
+            });
+
+            socket.once('connect_error', (error) => {
+              clearTimeout(timeout);
+              console.error('❌ Socket connection failed:', error);
+              reject(error);
+            });
+          });
+        }
+
+        setIsLoading(true);
+
+        // Create room on server and wait for response
+        console.log('🚀 Sending room creation request...', { roomId: newRoom.id });
+        
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            setError('Room creation timeout');
+            setIsLoading(false);
+            reject(new Error('Room creation timeout'));
+          }, 15000);
+
+          // Listen for room creation success
+          const onRoomCreated = (room: Room) => {
+            clearTimeout(timeout);
+            setCurrentRoom(room);
+            setHost(true);
+            setIsLoading(false);
+            
+            const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+            const roomUrl = `${baseUrl}/room/${room.id}`;
+            
+            // Clean up listeners
+            socketService.off('room:created', onRoomCreated);
+            socketService.off('error', onError);
+            
+            resolve({
+              room: room,
+              url: roomUrl
+            });
+          };
+
+          // Listen for errors
+          const onError = (error: { message: string; code?: string }) => {
+            clearTimeout(timeout);
+            setError(error.message);
+            setIsLoading(false);
+            
+            // Clean up listeners
+            socketService.off('room:created', onRoomCreated);
+            socketService.off('error', onError);
+          };
+
+          // Register event listeners
+          socketService.on('room:created', onRoomCreated);
+          socketService.on('error', onError);
+
+          // Send room creation request
+          socketService.createRoom(newRoom);
+        });
+
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Failed to create room';
+        setError(errorMsg);
+        return null;
+      } finally {
+        setIsCreating(false);
+      }
+    },
+    [currentUser, setError, setIsLoading, setCurrentRoom, setHost, connectSocket]
   );
 
   /**
@@ -100,10 +279,10 @@ export function useRoom() {
 
       try {
         // Connect to socket if not already connected
-        const socket = socketService.connect();
+        const socket = connectSocket();
         if (!socket.connected) {
-          await new Promise((resolve) => {
-            socket.once('connect', resolve);
+          await new Promise<void>((resolve) => {
+            socket.once('connect', () => resolve());
           });
         }
 
@@ -119,7 +298,7 @@ export function useRoom() {
             resolve(false);
           }, 10000);
 
-          socketService.on('room-update', (room: Room) => {
+          socketService.on('room:joined', (room: Room) => {
             clearTimeout(timeout);
             setCurrentRoom(room);
             setIsJoining(false);
@@ -132,9 +311,9 @@ export function useRoom() {
             resolve(true);
           });
 
-          socketService.on('error', (error: string) => {
+          socketService.on('error', (error: { message: string; code?: string }) => {
             clearTimeout(timeout);
-            setError(error);
+            setError(error.message);
             setIsJoining(false);
             resolve(false);
           });
@@ -146,7 +325,7 @@ export function useRoom() {
         return false;
       }
     },
-    [currentUser, setCurrentRoom, setHost, setError, router]
+    [currentUser, setCurrentRoom, setHost, setError, router, connectSocket]
   );
 
   /**
@@ -237,7 +416,11 @@ export function useRoom() {
         return;
       }
 
-      const newHost = currentRoom.participants.find(p => p.id === newHostId);
+      const newHost = currentRoom.participants.find(p => {
+        // Check if it's a Participant or User and compare appropriately
+        const participantId = 'userId' in p ? p.userId : p.id;
+        return participantId === newHostId;
+      });
       if (!newHost) {
         setError('Participant not found');
         return;
@@ -272,63 +455,14 @@ export function useRoom() {
     return currentRoom?.hostId === currentUser?.id;
   }, [currentRoom, currentUser]);
 
-  // Setup socket event listeners
-  useEffect(() => {
-    socketService.on('room-update', (room: Room) => {
-      setCurrentRoom(room);
-    });
-
-    socketService.on('user-joined', (user: User) => {
-      addParticipant(user);
-    });
-
-    socketService.on('user-left', (userId: string) => {
-      removeParticipant(userId);
-    });
-
-    socketService.on('participant-kicked', (participantId: string) => {
-      if (participantId === currentUser?.id) {
-        // Current user was kicked
-        leaveRoom();
-        setError('You have been removed from the room');
-      } else {
-        removeParticipant(participantId);
-      }
-    });
-
-    socketService.on('host-transferred', (data: { newHostId: string; newHost: User }) => {
-      updateRoom({ hostId: data.newHostId });
-      if (data.newHostId === currentUser?.id) {
-        setHost(true);
-      } else if (currentRoom?.hostId === currentUser?.id) {
-        setHost(false);
-      }
-    });
-
-    return () => {
-      socketService.off('room-update');
-      socketService.off('user-joined');
-      socketService.off('user-left');
-      socketService.off('participant-kicked');
-      socketService.off('host-transferred');
-    };
-  }, [
-    currentUser,
-    currentRoom,
-    setCurrentRoom,
-    addParticipant,
-    removeParticipant,
-    updateRoom,
-    setHost,
-    setError,
-    leaveRoom,
-  ]);
+  
 
   return {
     currentRoom,
     isJoining,
     isCreating,
     createRoom,
+    createRoomWithUrl,
     joinRoom,
     leaveRoom,
     updateRoomSettings,
@@ -336,5 +470,6 @@ export function useRoom() {
     transferHost,
     getRoomShareUrl,
     isHost: isHost(),
+    isLoading,
   };
 }

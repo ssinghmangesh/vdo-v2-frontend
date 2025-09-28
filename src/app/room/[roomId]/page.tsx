@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { useRoom } from '@/hooks/use-room';
 import { VideoCall } from '@/components/video-call';
 import { copyToClipboard } from '@/utils/common';
-import { Share, Users, MessageCircle, Settings, X } from 'lucide-react';
+import { Share, Users, X } from 'lucide-react';
 
 export default function RoomPage() {
   const router = useRouter();
@@ -15,26 +15,17 @@ export default function RoomPage() {
   const roomId = params.roomId as string;
   
   const [showParticipants, setShowParticipants] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   
-  const { isAuthenticated, user } = useAuthStore();
+  const { user } = useAuthStore();
   const { currentRoom, joinRoom, isJoining, getRoomShareUrl } = useRoom();
 
-  // Redirect to auth if not authenticated
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push(`/?room=${roomId}`);
-      return;
-    }
-
-    // Join room automatically if not already in it
     if (!currentRoom && roomId) {
       joinRoom(roomId);
     }
-  }, [isAuthenticated, currentRoom, roomId, router, joinRoom]);
+  }, [currentRoom, roomId, router, joinRoom]);
 
   // Handle room sharing
   const handleShareRoom = async () => {
@@ -48,24 +39,24 @@ export default function RoomPage() {
   };
 
   // Show loading state
-  if (!isAuthenticated || isJoining) {
+  if (isJoining) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-900">
         <div className="text-center">
           <div className="mb-4 h-16 w-16 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mx-auto"></div>
           <h2 className="text-xl font-semibold text-white mb-2">
-            {!isAuthenticated ? 'Redirecting to login...' : 'Joining room...'}
+            Joining room...
           </h2>
           <p className="text-gray-300">
-            {!isAuthenticated 
-              ? 'Please wait while we redirect you to authenticate' 
-              : 'Setting up your connection'
-            }
+            Setting up your connection
           </p>
         </div>
       </div>
     );
   }
+
+  console.log("currentRoom", currentRoom);
+  console.log("isJoining", isJoining);
 
   // Show error if room join failed
   if (!currentRoom && !isJoining) {
@@ -97,8 +88,6 @@ export default function RoomPage() {
       </div>
     );
   }
-
-  console.log("currentRoom?.participants", currentRoom);
 
   return (
     <div className="h-screen flex flex-col bg-gray-900">
@@ -137,9 +126,7 @@ export default function RoomPage() {
         <div className={`flex-1 ${showParticipants ? 'mr-80' : ''}`}>
           <VideoCall
             className="h-full"
-            onSettingsClick={() => setShowSettings(true)}
             onParticipantsClick={() => setShowParticipants(true)}
-            onChatClick={() => setShowChat(true)}
           />
         </div>
 
@@ -157,28 +144,36 @@ export default function RoomPage() {
             </div>
             
             <div className="p-4 space-y-3">
-              {currentRoom?.participants.map((participant) => (
-                <div
-                  key={participant.id}
-                  className="flex items-center space-x-3 p-2 bg-gray-700 rounded-lg"
-                >
-                  <div className="h-8 w-8 bg-blue-600 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-semibold text-white">
-                      {participant.name?.charAt(0).toUpperCase() || 'U'}
-                    </span>
+              {currentRoom?.participants.map((participant) => {
+                // Handle both User and Participant types
+                const isParticipant = 'userId' in participant;
+                const participantData = isParticipant ? participant.user : participant;
+                const participantId = isParticipant ? participant.userId : participant.id;
+                const participantKey = isParticipant ? participant.userId : participant.id;
+                
+                return (
+                  <div
+                    key={participantKey}
+                    className="flex items-center space-x-3 p-2 bg-gray-700 rounded-lg"
+                  >
+                    <div className="h-8 w-8 bg-blue-600 rounded-full flex items-center justify-center">
+                      <span className="text-sm font-semibold text-white">
+                        {participantData.name?.charAt(0).toUpperCase() || 'U'}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white font-medium">
+                        {participantData.name}
+                        {participantId === user?.id && ' (You)'}
+                        {participantId === currentRoom?.hostId && ' (Host)'}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {participantData.email}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-white font-medium">
-                      {participant.name}
-                      {participant.id === user?.id && ' (You)'}
-                      {participant.id === currentRoom?.hostId && ' (Host)'}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {participant.email}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

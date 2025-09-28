@@ -1,8 +1,7 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
-import { Mic, MicOff, Video, VideoOff, Monitor, MonitorX } from 'lucide-react';
-import { useCallStore } from '@/store/call-store';
+import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { cn } from '@/utils/common';
 
@@ -10,25 +9,31 @@ interface LocalVideoProps {
   className?: string;
   showControls?: boolean;
   muted?: boolean;
+  stream?: MediaStream | null;
+  videoEnabled?: boolean;
+  audioEnabled?: boolean;
 }
 
 export function LocalVideo({ 
   className, 
   showControls = true, 
-  muted = true 
+  muted = true,
+  stream,
+  videoEnabled = true,
+  audioEnabled = true
 }: LocalVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { localStream, callSettings } = useCallStore();
   const { user } = useAuthStore();
 
   // Set up video stream
   useEffect(() => {
-    if (videoRef.current && localStream) {
-      videoRef.current.srcObject = localStream;
+    if (videoRef.current && stream) {
+      console.log('🎥 Setting up local video stream');
+      videoRef.current.srcObject = stream;
     }
-  }, [localStream]);
+  }, [stream]);
 
-  const { videoEnabled, audioEnabled, screenShareEnabled } = callSettings;
+  // Use props for media state
 
   return (
     <div className={cn(
@@ -36,14 +41,14 @@ export function LocalVideo({
       className
     )}>
       {/* Video Element */}
-      {localStream && videoEnabled ? (
+      {stream && videoEnabled ? (
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted={muted}
           className="h-full w-full object-cover"
-          style={{ transform: screenShareEnabled ? 'none' : 'scaleX(-1)' }} // Mirror for camera, not for screen share
+          style={{ transform: 'scaleX(-1)' }} // Mirror for camera
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gray-800">
@@ -54,7 +59,7 @@ export function LocalVideo({
               </span>
             </div>
             <p className="text-sm text-gray-300">
-              {videoEnabled ? 'No video' : 'Camera off'}
+              {stream ? (videoEnabled ? 'No video' : 'Camera off') : 'Initializing...'}
             </p>
           </div>
         </div>
@@ -94,12 +99,7 @@ export function LocalVideo({
           )}
         </div>
 
-        {/* Screen Share Status */}
-        {screenShareEnabled && (
-          <div className="flex items-center justify-center rounded-full bg-blue-600/80 p-1.5 text-white">
-            <Monitor className="h-3 w-3" />
-          </div>
-        )}
+        {/* Screen Share Status - Available for future use */}
       </div>
 
       {/* User Label */}

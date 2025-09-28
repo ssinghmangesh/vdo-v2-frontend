@@ -38,11 +38,11 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
     useLayoutEffect(() => {
       if (isAuthenticated) {
-        router.push('/');
+        router.push(pathname);
       } else if (!isPublicRoute) {
         router.push('/auth');
       }
-    }, [isAuthenticated, router, isPublicRoute]);
+    }, [isAuthenticated, router, isPublicRoute, pathname]);
 
     const handleLogout = () => {
         useAuthStore.getState().logout();

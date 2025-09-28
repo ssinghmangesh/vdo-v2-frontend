@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Room, User } from '@/types';
+import type { Participant, Room, User } from '@/types';
 
 interface RoomState {
   currentRoom: Room | null;
@@ -19,6 +19,7 @@ interface RoomActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   leaveRoom: () => void;
+  setIsLoading: (loading: boolean) => void;
 }
 
 export const useRoomStore = create<RoomState & RoomActions>((set, get) => ({
@@ -43,33 +44,83 @@ export const useRoomStore = create<RoomState & RoomActions>((set, get) => ({
     const currentRoom = get().currentRoom;
     if (!currentRoom) return;
 
-    const isAlreadyParticipant = currentRoom.participants.some(
-      (participant) => participant.id === user.id
-    );
+    // Check if participant already exists
+    const isAlreadyParticipant = currentRoom.participants.some((participant) => {
+      const participantId = 'userId' in participant ? participant.userId : participant.id;
+      return participantId === user.id;
+    });
 
     if (!isAlreadyParticipant) {
-      set((state) => ({
-        currentRoom: state.currentRoom
-          ? {
+      set((state) => {
+        if (!state.currentRoom) return state;
+        
+        // Keep consistent type - if current participants are Users, add User; if Participants, convert
+        const firstParticipant = state.currentRoom.participants[0];
+        const isParticipantArray = firstParticipant && 'userId' in firstParticipant;
+        
+        if (isParticipantArray) {
+          // Convert user to participant format
+          const newParticipant: Participant = {
+            peerId: `peer_${user.id}`,
+            userId: user.id,
+            user: user,
+            mediaState: {
+              videoEnabled: true,
+              audioEnabled: true,
+              screenShareEnabled: false,
+            },
+            isConnected: true,
+            joinedAt: new Date(),
+          };
+          return {
+            currentRoom: {
               ...state.currentRoom,
-              participants: [...state.currentRoom.participants, user],
-            }
-          : null,
-      }));
+              participants: [...(state.currentRoom.participants as Participant[]), newParticipant],
+            },
+          };
+        } else {
+          // Add as User
+          return {
+            currentRoom: {
+              ...state.currentRoom,
+              participants: [...(state.currentRoom.participants as User[]), user],
+            },
+          };
+        }
+      });
     }
   },
 
   removeParticipant: (userId: string) => {
-    set((state) => ({
-      currentRoom: state.currentRoom
-        ? {
+    set((state) => {
+      if (!state.currentRoom) return state;
+      
+      // Check if we're dealing with Participant[] or User[]
+      const firstParticipant = state.currentRoom.participants[0];
+      const isParticipantArray = firstParticipant && 'userId' in firstParticipant;
+      
+      if (isParticipantArray) {
+        const filteredParticipants = (state.currentRoom.participants as Participant[]).filter(
+          (participant) => participant.userId !== userId
+        );
+        return {
+          currentRoom: {
             ...state.currentRoom,
-            participants: state.currentRoom.participants.filter(
-              (participant) => participant.id !== userId
-            ),
-          }
-        : null,
-    }));
+            participants: filteredParticipants,
+          },
+        };
+      } else {
+        const filteredParticipants = (state.currentRoom.participants as User[]).filter(
+          (participant) => participant.id !== userId
+        );
+        return {
+          currentRoom: {
+            ...state.currentRoom,
+            participants: filteredParticipants,
+          },
+        };
+      }
+    });
   },
 
   setRooms: (rooms: Room[]) => {
@@ -98,5 +149,9 @@ export const useRoomStore = create<RoomState & RoomActions>((set, get) => ({
 
   leaveRoom: () => {
     set({ currentRoom: null });
+  },
+
+  setIsLoading: (loading: boolean) => {
+    set({ isLoading: loading });
   },
 }));
