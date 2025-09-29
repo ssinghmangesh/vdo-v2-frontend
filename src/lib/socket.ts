@@ -100,7 +100,7 @@ class SocketService {
   createRoom(room: Room): void {
     if (!this.isReady()) return;
 
-    console.log('📝 Creating room:', { roomId: room.id, roomName: room.name });
+    console.log('📝 Creating room:', { roomId: room.roomId, roomName: room.name });
     this.socket!.emit('room:create', room);
   }
 

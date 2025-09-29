@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
@@ -17,15 +17,55 @@ export default function RoomPage() {
   const [showParticipants, setShowParticipants] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const hasJoinedOnceRef = useRef(false);
+  const isLeavingRef = useRef(false);
   
   const { user } = useAuthStore();
   const { currentRoom, joinRoom, isJoining, getRoomShareUrl } = useRoom();
 
   useEffect(() => {
-    if (!currentRoom && roomId) {
+    // Check global leaving flag to prevent auto-rejoin
+    const isGlobalLeaving = window.__LEAVING_ROOM__ || false;
+    
+    // Only join if we haven't joined before and we don't have a current room and we're not leaving
+    console.log('🔍 Room join check:', {
+      currentRoom: !!currentRoom,
+      roomId,
+      hasJoinedOnce: hasJoinedOnceRef.current,
+      isLeaving: isLeavingRef.current,
+      isGlobalLeaving,
+      shouldJoin: !currentRoom && roomId && !hasJoinedOnceRef.current && !isLeavingRef.current && !isGlobalLeaving
+    });
+    
+    if (!currentRoom && roomId && !hasJoinedOnceRef.current && !isLeavingRef.current && !isGlobalLeaving) {
+      console.log('✅ First time joining room:', roomId);
+      hasJoinedOnceRef.current = true;
       joinRoom(roomId);
     }
-  }, [currentRoom, roomId, router, joinRoom]);
+  }, [currentRoom, roomId, joinRoom]);
+
+  // Reset the join flag if we're in a different room
+  useEffect(() => {
+    if (currentRoom && currentRoom.roomId !== roomId) {
+      hasJoinedOnceRef.current = false;
+    }
+  }, [currentRoom, roomId]);
+
+  // Detect when we're about to leave this component (cleanup)
+  useEffect(() => {
+    return () => {
+      console.log('🚪 Room page component unmounting, setting leaving flag');
+      isLeavingRef.current = true;
+    };
+  }, []);
+
+  // Reset leaving flag when currentRoom changes to non-null (successful join)
+  useEffect(() => {
+    if (currentRoom) {
+      console.log('🏠 Successfully in room, resetting leaving flag');
+      isLeavingRef.current = false;
+    }
+  }, [currentRoom]);
 
   // Handle room sharing
   const handleShareRoom = async () => {
@@ -58,8 +98,8 @@ export default function RoomPage() {
   console.log("currentRoom", currentRoom);
   console.log("isJoining", isJoining);
 
-  // Show error if room join failed
-  if (!currentRoom && !isJoining) {
+  // Show error if room join failed (but not if we're leaving)
+  if (!currentRoom && !isJoining && !window.__LEAVING_ROOM__) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-900">
         <div className="max-w-md text-center">
@@ -72,7 +112,13 @@ export default function RoomPage() {
           </p>
           <div className="space-y-3">
             <button
-              onClick={() => joinRoom(roomId)}
+              onClick={() => {
+                // Reset all flags before retrying
+                window.__LEAVING_ROOM__ = false;
+                hasJoinedOnceRef.current = false;
+                isLeavingRef.current = false;
+                joinRoom(roomId);
+              }}
               className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
             >
               Try Again
@@ -126,7 +172,6 @@ export default function RoomPage() {
         <div className={`flex-1 ${showParticipants ? 'mr-80' : ''}`}>
           <VideoCall
             className="h-full"
-            onParticipantsClick={() => setShowParticipants(true)}
           />
         </div>
 

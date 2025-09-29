@@ -1,79 +1,46 @@
 'use client';
 
-import { useState } from 'react';
 import { 
   Mic, 
   MicOff, 
   Video, 
   VideoOff, 
   Monitor, 
-  MonitorX, 
-  PhoneOff, 
-  Settings,
-  Users,
-  MessageCircle,
-  MoreVertical
+  MonitorX,
+  PhoneOff
 } from 'lucide-react';
-import { useCallStore } from '@/store/call-store';
-import { useRoomStore } from '@/store/room-store';
-import { useMedia } from '@/hooks/use-media';
-import { useRoom } from '@/hooks/use-room';
 import { cn } from '@/utils/common';
 
 interface CallControlsProps {
   className?: string;
-  onSettingsClick?: () => void;
-  onParticipantsClick?: () => void;
-  onChatClick?: () => void;
+  // Media state
+  videoEnabled: boolean;
+  audioEnabled: boolean;
+  isScreenSharing: boolean;
+  // Media control functions
+  onToggleVideo: () => void;
+  onToggleAudio: () => void;
+  onToggleScreenShare: () => void;
+  onLeaveCall: () => void;
+  // Loading states
+  isTogglingVideo?: boolean;
+  isTogglingAudio?: boolean;
+  isTogglingScreenShare?: boolean;
 }
 
 export function CallControls({
   className,
-  onSettingsClick,
-  onParticipantsClick,
-  onChatClick,
+  videoEnabled,
+  audioEnabled,
+  isScreenSharing,
+  onToggleVideo,
+  onToggleAudio,
+  onToggleScreenShare,
+  onLeaveCall,
+  isTogglingVideo = false,
+  isTogglingAudio = false,
+  isTogglingScreenShare = false,
 }: CallControlsProps) {
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
-  const { callSettings, isInCall } = useCallStore();
-  const { currentRoom } = useRoomStore();
-  const { 
-    toggleVideo, 
-    toggleAudio, 
-    startScreenShare, 
-    stopScreenShare, 
-    isScreenSharing 
-  } = useMedia();
-  const { leaveRoom } = useRoom();
-
-  const { videoEnabled, audioEnabled } = callSettings;
-
-  const handleToggleVideo = () => {
-    toggleVideo();
-  };
-
-  const handleToggleAudio = () => {
-    toggleAudio();
-  };
-
-  const handleToggleScreenShare = async () => {
-    try {
-      if (isScreenSharing) {
-        await stopScreenShare();
-      } else {
-        await startScreenShare();
-      }
-    } catch (error) {
-      console.error('Failed to toggle screen share:', error);
-    }
-  };
-
-  const handleEndCall = () => {
-    if (window.confirm('Are you sure you want to leave the call?')) {
-      leaveRoom();
-    }
-  };
-
-  const participantCount = currentRoom?.participants.length || 0;
 
   return (
     <div className={cn(
@@ -82,16 +49,20 @@ export function CallControls({
     )}>
       {/* Audio Toggle */}
       <button
-        onClick={handleToggleAudio}
+        onClick={onToggleAudio}
+        disabled={isTogglingAudio}
         className={cn(
           'flex h-12 w-12 items-center justify-center rounded-full transition-all duration-200',
+          'disabled:opacity-50 disabled:cursor-not-allowed',
           audioEnabled
             ? 'bg-gray-700 text-white hover:bg-gray-600'
             : 'bg-red-600 text-white hover:bg-red-700'
         )}
         title={audioEnabled ? 'Mute microphone' : 'Unmute microphone'}
       >
-        {audioEnabled ? (
+        {isTogglingAudio ? (
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        ) : audioEnabled ? (
           <Mic className="h-5 w-5" />
         ) : (
           <MicOff className="h-5 w-5" />
@@ -100,16 +71,20 @@ export function CallControls({
 
       {/* Video Toggle */}
       <button
-        onClick={handleToggleVideo}
+        onClick={onToggleVideo}
+        disabled={isTogglingVideo}
         className={cn(
           'flex h-12 w-12 items-center justify-center rounded-full transition-all duration-200',
+          'disabled:opacity-50 disabled:cursor-not-allowed',
           videoEnabled
             ? 'bg-gray-700 text-white hover:bg-gray-600'
             : 'bg-red-600 text-white hover:bg-red-700'
         )}
         title={videoEnabled ? 'Turn off camera' : 'Turn on camera'}
       >
-        {videoEnabled ? (
+        {isTogglingVideo ? (
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        ) : videoEnabled ? (
           <Video className="h-5 w-5" />
         ) : (
           <VideoOff className="h-5 w-5" />
@@ -118,27 +93,31 @@ export function CallControls({
 
       {/* Screen Share Toggle */}
       <button
-        onClick={handleToggleScreenShare}
+        onClick={onToggleScreenShare}
+        disabled={isTogglingScreenShare}
         className={cn(
           'flex h-12 w-12 items-center justify-center rounded-full transition-all duration-200',
+          'disabled:opacity-50 disabled:cursor-not-allowed',
           isScreenSharing
             ? 'bg-blue-600 text-white hover:bg-blue-700'
             : 'bg-gray-700 text-white hover:bg-gray-600'
         )}
         title={isScreenSharing ? 'Stop screen share' : 'Share screen'}
       >
-        {isScreenSharing ? (
+        {isTogglingScreenShare ? (
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        ) : isScreenSharing ? (
           <MonitorX className="h-5 w-5" />
         ) : (
           <Monitor className="h-5 w-5" />
         )}
       </button>
 
-      {/* End Call */}
+      {/* Leave Call */}
       <button
-        onClick={handleEndCall}
+        onClick={onLeaveCall}
         className="flex h-12 w-12 items-center justify-center rounded-full bg-red-600 text-white transition-all duration-200 hover:bg-red-700"
-        title="End call"
+        title="Leave call"
       >
         <PhoneOff className="h-5 w-5" />
       </button>

@@ -25,6 +25,10 @@ export function LocalVideo({
   const videoRef = useRef<HTMLVideoElement>(null);
   const { user } = useAuthStore();
 
+  console.log('🎥 Local video stream:', stream);
+  console.log('🎥 Video enabled:', videoEnabled);
+  console.log('🎥 Audio enabled:', audioEnabled);
+
   // Set up video stream
   useEffect(() => {
     if (videoRef.current && stream) {

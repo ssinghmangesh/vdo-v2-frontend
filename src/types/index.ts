@@ -6,7 +6,8 @@ export interface User {
 }
 
 export interface Room {
-  id: string;
+  roomId?: string;
+  id?: string;
   name: string;
   participants: Participant[] | User[];
   createdAt: Date;
@@ -99,3 +100,10 @@ export type WebRTCSignal = RTCSessionDescriptionInit | RTCIceCandidateInit | {
   type: string;
   [key: string]: unknown;
 };
+
+// Global window properties
+declare global {
+  interface Window {
+    __LEAVING_ROOM__?: boolean;
+  }
+}

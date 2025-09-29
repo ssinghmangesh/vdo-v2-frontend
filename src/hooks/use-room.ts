@@ -60,6 +60,15 @@ export function useRoom() {
     'error': (error: { message: string; code?: string }) => {
       console.error('❌ Error:', error);
     },
+    'webrtc:offer': (data: { from: string; offer: RTCSessionDescriptionInit; roomId: string }) => {
+      console.log('✅ WebRTC offer:', data);
+    },
+    'webrtc:answer': (data: { from: string; answer: RTCSessionDescriptionInit; roomId: string }) => {
+      console.log('✅ WebRTC answer:', data);
+    },
+    'webrtc:ice-candidate': (data: { from: string; candidate: RTCIceCandidateInit; roomId: string }) => {
+      console.log('✅ WebRTC ICE candidate:', data);
+    },
     'room:user-joined': (room: RoomUserJoined) => {
       console.log('✅ Room user joined:', room);
       // Convert to Participant[] when needed
@@ -222,7 +231,7 @@ export function useRoom() {
             setIsLoading(false);
             
             const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-            const roomUrl = `${baseUrl}/room/${room.id}`;
+            const roomUrl = `${baseUrl}/room/${room.roomId}`;
             
             // Clean up listeners
             socketService.off('room:created', onRoomCreated);
@@ -332,24 +341,52 @@ export function useRoom() {
    * Leave current room
    */
   const leaveRoom = useCallback(() => {
-    if (!currentRoom) return;
+    if (!currentRoom) {
+      console.log('⚠️ No current room to leave');
+      return;
+    }
 
     try {
-      // Leave room on server
-      socketService.leaveRoom(currentRoom.id);
+      const roomId = currentRoom.roomId || currentRoom.id || '';
+      console.log('🚪 Leaving room:', roomId, 'Current room state:', !!currentRoom);
       
-      // Reset local state
+      // Set global leaving flag IMMEDIATELY to prevent any auto-rejoin attempts
+      window.__LEAVING_ROOM__ = true;
+      
+      // Reset local state FIRST to prevent auto-rejoin
       leaveRoomStore();
-      resetCall();
       
-      // Navigate back to home
+      // Navigate immediately to home page
       router.push('/');
+      
+      // Then clean up server-side and call state (async)
+      setTimeout(() => {
+        try {
+          socketService.leaveRoom(roomId);
+          resetCall();
+          console.log('✅ Successfully left room and reset state');
+        } catch (serverError) {
+          console.error('❌ Error leaving room on server:', serverError);
+          resetCall();
+        }
+        // Clear the leaving flag after everything is done
+        window.__LEAVING_ROOM__ = false;
+      }, 1000); // Longer delay to ensure navigation is complete
+      
     } catch (error) {
-      console.error('Error leaving room:', error);
-      // Still reset local state even if server request fails
+      console.error('❌ Error leaving room:', error);
+      // Set flag even on error
+      window.__LEAVING_ROOM__ = true;
+      
+      // Still reset local state and navigate
       leaveRoomStore();
-      resetCall();
       router.push('/');
+      
+      // Clean up in background
+      setTimeout(() => {
+        resetCall();
+        window.__LEAVING_ROOM__ = false;
+      }, 1000);
     }
   }, [currentRoom, leaveRoomStore, resetCall, router]);
 
@@ -370,7 +407,7 @@ export function useRoom() {
       
       // Send update to server
       socketService.emit('update-room', {
-        roomId: currentRoom.id,
+        roomId: currentRoom.roomId,
         ...settings,
       });
     },
@@ -396,7 +433,7 @@ export function useRoom() {
       }
 
       socketService.emit('kick-participant', {
-        roomId: currentRoom.id,
+        roomId: currentRoom.roomId,
         participantId,
       });
     },
@@ -427,7 +464,7 @@ export function useRoom() {
       }
 
       socketService.emit('transfer-host', {
-        roomId: currentRoom.id,
+        roomId: currentRoom.roomId,
         newHostId,
       });
 
@@ -445,7 +482,7 @@ export function useRoom() {
     if (!currentRoom) return '';
     
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${baseUrl}/join/${currentRoom.id}`;
+    return `${baseUrl}/join/${currentRoom.roomId}`;
   }, [currentRoom]);
 
   /**

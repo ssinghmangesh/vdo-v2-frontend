@@ -51,7 +51,7 @@ export function useWebRTC() {
           peerId,
           getCurrentUserId(),
           event.candidate.toJSON(),
-          currentRoom.id
+          currentRoom.roomId || ''
         );
       }
     };
@@ -141,7 +141,7 @@ export function useWebRTC() {
         targetUserId,
         getCurrentUserId(),
         offer,
-        currentRoom.id
+        currentRoom.roomId || ''
       );
 
     } catch (error) {
@@ -157,7 +157,7 @@ export function useWebRTC() {
     offer: RTCSessionDescriptionInit; 
     roomId: string 
   }) => {
-    if (!currentRoom || !currentUser || data.roomId !== currentRoom.id) return;
+    if (!currentRoom || !currentUser || data.roomId !== currentRoom.roomId) return;
 
     console.log('📞 Handling offer from:', data.from);
 
@@ -195,7 +195,7 @@ export function useWebRTC() {
         data.from,
         getCurrentUserId(),
         answer,
-        currentRoom.id
+        currentRoom.roomId
       );
 
     } catch (error) {
@@ -209,7 +209,7 @@ export function useWebRTC() {
     answer: RTCSessionDescriptionInit; 
     roomId: string 
   }) => {
-    if (!currentRoom || data.roomId !== currentRoom.id) return;
+    if (!currentRoom || data.roomId !== currentRoom.roomId) return;
 
     console.log('📞 Handling answer from:', data.from);
 
@@ -229,7 +229,7 @@ export function useWebRTC() {
     candidate: RTCIceCandidateInit; 
     roomId: string 
   }) => {
-    if (!currentRoom || data.roomId !== currentRoom.id) return;
+    if (!currentRoom || data.roomId !== currentRoom.roomId) return;
 
     console.log('🧊 Handling ICE candidate from:', data.from);
 

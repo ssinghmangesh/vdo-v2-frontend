@@ -135,7 +135,7 @@ export const useRoomStore = create<RoomState & RoomActions>((set, get) => ({
 
   removeRoom: (roomId: string) => {
     set((state) => ({
-      rooms: state.rooms.filter((room) => room.id !== roomId),
+      rooms: state.rooms.filter((room) => room.roomId !== roomId),
     }));
   },
 
