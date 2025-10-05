@@ -1,9 +1,9 @@
 import { create } from 'zustand';
-import type { CallState, CallSettings, PeerConnection, User } from '@/types';
+import type { CallState, CallSettings, User } from '@/types';
 
 interface CallActions {
   setLocalStream: (stream: MediaStream | null) => void;
-  addPeer: (peerId: string, peer: any, user: User, stream?: MediaStream) => void;
+  addPeer: (peerId: string, peer: RTCPeerConnection | unknown, user: User, stream?: MediaStream) => void;
   removePeer: (peerId: string) => void;
   updateCallSettings: (settings: Partial<CallSettings>) => void;
   setCallState: (isInCall: boolean, isConnecting?: boolean) => void;
@@ -33,7 +33,7 @@ export const useCallStore = create<CallState & CallActions>((set, get) => ({
     set({ localStream: stream });
   },
 
-  addPeer: (peerId: string, peer: any, user: User, stream?: MediaStream) => {
+  addPeer: (peerId: string, peer: RTCPeerConnection | unknown, user: User, stream?: MediaStream) => {
     set((state) => ({
       peers: {
         ...state.peers,
@@ -53,7 +53,7 @@ export const useCallStore = create<CallState & CallActions>((set, get) => ({
     
     // Clean up peer connection
     if (peer?.peer) {
-      peer.peer.destroy();
+      (peer.peer as RTCPeerConnection).close();
     }
     
     // Clean up stream
@@ -63,6 +63,7 @@ export const useCallStore = create<CallState & CallActions>((set, get) => ({
 
     set((state) => {
       const { [peerId]: removed, ...remainingPeers } = state.peers;
+      console.log('🔄 Removing peer:', removed);
       return { peers: remainingPeers };
     });
   },
@@ -105,7 +106,7 @@ export const useCallStore = create<CallState & CallActions>((set, get) => ({
     // Clean up all peer connections
     Object.values(state.peers).forEach((peerConnection) => {
       if (peerConnection.peer) {
-        peerConnection.peer.destroy();
+        (peerConnection.peer as RTCPeerConnection).close();
       }
       if (peerConnection.stream) {
         peerConnection.stream.getTracks().forEach(track => track.stop());

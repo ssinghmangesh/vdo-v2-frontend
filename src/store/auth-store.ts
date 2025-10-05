@@ -34,16 +34,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           if (response.success && response.data) {
             const { user, token } = response.data;
             
-            // Convert API user format to frontend format
-            const frontendUser: User = {
-              id: user._id,
-              name: user.name,
-              email: user.email,
-              avatar: user.avatar,
-            };
-            
             set({
-              user: frontendUser,
+              user,
               token,
               isAuthenticated: true,
               isLoading: false
@@ -71,16 +63,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           if (response.success && response.data) {
             const { user, token } = response.data;
             
-            // Convert API user format to frontend format
-            const frontendUser: User = {
-              id: user._id,
-              name: user.name,
-              email: user.email,
-              avatar: user.avatar,
-            };
-            
             set({
-              user: frontendUser,
+              user,
               token,
               isAuthenticated: true,
               isLoading: false
@@ -140,15 +124,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             const response = await apiClient.getProfile();
             
             if (response.success && response.data) {
-              const frontendUser: User = {
-                id: response.data._id,
-                name: response.data.name,
-                email: response.data.email,
-                avatar: response.data.avatar,
-              };
               
               set({
-                user: frontendUser,
+                user: response.data,
                 token,
                 isAuthenticated: true,
                 isLoading: false
@@ -184,14 +162,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           const response = await apiClient.updateProfile(data);
           
           if (response.success && response.data) {
-            const frontendUser: User = {
-              id: response.data._id,
-              name: response.data.name,
-              email: response.data.email,
-              avatar: response.data.avatar,
-            };
-            
-            set({ user: frontendUser });
+            set({ user: response.data });
             return true;
           }
           

@@ -92,6 +92,8 @@ class SocketService {
     
     console.log('🚪 Leaving room:', { roomId });
     this.socket!.emit('room:leave', roomId);
+    this.socket!.disconnect();
+    console.log("✅ Disconnected from socket");
   }
 
   /**
@@ -224,12 +226,12 @@ class SocketService {
    */
   private isReady(): boolean {
     if (!this.socket) {
-      console.error('🔌 Socket not initialized');
+      console.log('🔌 Socket not initialized');
       return false;
     }
     
     if (!this.isConnected) {
-      console.error('🔌 Socket not connected to server');
+      console.log('🔌 Socket not connected to server');
       return false;
     }
 

@@ -5,38 +5,29 @@ import { useRoomStore } from '@/store/room-store';
 import { useMedia } from '@/hooks/use-media';
 import { useWebRTC } from '@/hooks/use-webrtc';
 import { useAuthStore } from '@/store/auth-store';
-import { useRoom } from '@/hooks/use-room';
 import { LocalVideo } from './local-video';
 import { RemoteVideo } from './remote-video';
 import { CallControls } from './call-controls';
 import { cn } from '@/utils/common';
-// import type { CallSettings } from '@/types'; // Available for future use
+import toast from 'react-hot-toast';
+import { getUserMedia } from '@/utils/media';
 
 interface VideoCallProps {
   className?: string;
+  leaveRoom: () => void;
 }
-
-// Default call settings available for future use
-// const defaultCallSettings: CallSettings = {
-//   videoEnabled: true,
-//   audioEnabled: true,
-//   screenShareEnabled: false,
-//   backgroundBlurEnabled: false,
-//   noiseReductionEnabled: true,
-// };
 
 export function VideoCall({
   className,
+  leaveRoom
 }: VideoCallProps) {
   // Local state for call functionality
-  const [isInitialized, setIsInitialized] = useState(false);
   const [layoutMode, setLayoutMode] = useState<'grid' | 'spotlight'>('grid');
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [callError, setCallError] = useState<string | null>(null);
-  
   // Media control state
-  const [videoEnabled, setVideoEnabled] = useState(true);
-  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [videoEnabled, setVideoEnabled] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isTogglingVideo, setIsTogglingVideo] = useState(false);
   const [isTogglingAudio, setIsTogglingAudio] = useState(false);
@@ -45,8 +36,7 @@ export function VideoCall({
   // Store references
   const { currentRoom, error: roomError } = useRoomStore();
   const { user: currentUser } = useAuthStore();
-  const { initializeMedia, toggleVideo, toggleAudio, error: mediaError } = useMedia();
-  const { leaveRoom } = useRoom();
+  const { videoStream, audioStream, initializeMedia, toggleVideo, toggleAudio, error: mediaError } = useMedia();
   const { 
     peers, 
     isConnecting: webrtcConnecting, 
@@ -57,45 +47,32 @@ export function VideoCall({
   const error = callError || roomError;
   const isConnecting = webrtcConnecting;
 
-  // Initialize media when component mounts
-  useEffect(() => {
-    const initCall = async () => {
-      if (!isInitialized && currentRoom && currentUser) {
-        try {
-          setCallError(null);
-          console.log('🎥 Initializing video call for room:', currentRoom.id);
-          
-          const stream = await initializeMedia();
-          if (stream) {
-            console.log('🎥 Received stream from initializeMedia:', !!stream);
-            console.log('🎥 Stream tracks:', stream.getTracks().map(t => `${t.kind}: ${t.enabled}`));
-            
-            setLocalStream(stream);
-            setWebRTCLocalStream(stream);
-            setIsInitialized(true);
-            
-            console.log('✅ Media initialized successfully, local stream set');
-          } else {
-            throw new Error('Failed to initialize media stream');
-          }
-          
-        } catch (error) {
-          console.error('Failed to initialize call:', error);
-          setCallError(error instanceof Error ? error.message : 'Failed to initialize call');
-        }
-      }
-    };
+  console.log('🔍 Peers:', peers);
+  console.log('🔍 Current Room:', currentRoom);
 
-    initCall();
-  }, [currentRoom, currentUser, isInitialized, initializeMedia, setWebRTCLocalStream]);
+  // setting the webRTC local stream
+  useEffect(() => {
+    if (videoStream && audioStream) {
+      getUserMedia()
+        .then((stream) => {
+          setWebRTCLocalStream(stream);
+        })
+        .catch((err) => {
+          console.error('Error getting user media:', err);
+          setWebRTCLocalStream(null);
+          toast.error(err.message);
+        });
+    } else if (!videoStream && !audioStream) {
+      setWebRTCLocalStream(null);
+    } else {
+      console.log('🔄 Setting local stream:', videoStream || audioStream);
+      setWebRTCLocalStream(videoStream || audioStream);
+    }
+  }, [videoStream, audioStream, setWebRTCLocalStream]);
 
   // Connect to other participants when room participants change
   useEffect(() => {
-    if (isInitialized && currentRoom && currentUser && localStream) {
-      console.log('🌐 Room participants updated, connecting to peers...');
-      console.log('🌐 Current room participants:', currentRoom.participants.length);
-      console.log('🌐 Current user:', currentUser.id);
-      console.log('🌐 Local stream available:', !!localStream);
+    if (currentRoom && currentUser) {
       
       // Small delay to ensure all participants are properly loaded
       const timer = setTimeout(() => {
@@ -104,11 +81,9 @@ export function VideoCall({
 
       return () => clearTimeout(timer);
     }
-  }, [
-    isInitialized, 
+  }, [ 
     currentRoom, 
     currentUser, 
-    localStream, 
     connectToAllParticipants
   ]);
 
@@ -119,34 +94,34 @@ export function VideoCall({
 
   // Media control functions
   const handleToggleVideo = useCallback(async () => {
-    if (!localStream || isTogglingVideo) return;
-    
+    if (isTogglingVideo) return;
+
     setIsTogglingVideo(true);
-    try {
-      const newEnabled = toggleVideo(!videoEnabled);
+    const { newEnabled, error } = await toggleVideo(videoEnabled);
+
+    if (error) {
+      toast.error(error);
+    } else {
       setVideoEnabled(newEnabled);
-      console.log('📹 Video toggled:', newEnabled);
-    } catch (error) {
-      console.error('❌ Failed to toggle video:', error);
-    } finally {
-      setIsTogglingVideo(false);
     }
-  }, [localStream, videoEnabled, toggleVideo, isTogglingVideo]);
+
+    setIsTogglingVideo(false);
+  }, [videoEnabled, toggleVideo, isTogglingVideo]);
 
   const handleToggleAudio = useCallback(async () => {
-    if (!localStream || isTogglingAudio) return;
+    if (isTogglingAudio) return;
     
     setIsTogglingAudio(true);
-    try {
-      const newEnabled = toggleAudio(!audioEnabled);
+    const { newEnabled, error } = await toggleAudio(audioEnabled);
+
+    if (error) {
+      toast.error(error);
+    } else {
       setAudioEnabled(newEnabled);
-      console.log('🎤 Audio toggled:', newEnabled);
-    } catch (error) {
-      console.error('❌ Failed to toggle audio:', error);
-    } finally {
-      setIsTogglingAudio(false);
     }
-  }, [localStream, audioEnabled, toggleAudio, isTogglingAudio]);
+
+    setIsTogglingAudio(false);
+  }, [audioEnabled, toggleAudio, isTogglingAudio]);
 
   const handleToggleScreenShare = useCallback(async () => {
     if (isTogglingScreenShare) return;
@@ -268,7 +243,7 @@ export function VideoCall({
   };
 
   // Show loading state
-  if (!isInitialized || isConnecting) {
+  if (isConnecting) {
     return (
       <div className={cn(
         'flex h-full items-center justify-center bg-gray-900',
@@ -331,7 +306,7 @@ export function VideoCall({
                 'h-full min-h-[200px]',
                 layoutMode === 'spotlight' && hasRemotePeers && 'h-32'
               )}
-              stream={localStream}
+              stream={videoStream}
               videoEnabled={videoEnabled}
               audioEnabled={audioEnabled}
             />
@@ -373,19 +348,6 @@ export function VideoCall({
             </button>
           </div>
         )}
-      </div>
-
-      {/* Debug Info */}
-      <div className="absolute left-4 top-4 rounded bg-black/50 p-2 text-xs text-white">
-        <div>Local Stream: {localStream ? '✅' : '❌'}</div>
-        <div>Peers: {Object.keys(peers).length}</div>
-        <div>Initialized: {isInitialized ? '✅' : '❌'}</div>
-        <div>Connecting: {isConnecting ? '🔄' : '✅'}</div>
-        {Object.entries(peers).map(([peerId, peer]) => (
-          <div key={peerId}>
-            {peerId}: {peer.stream ? '📹' : '❌'}
-          </div>
-        ))}
       </div>
 
       {/* Call Controls */}

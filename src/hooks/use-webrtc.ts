@@ -18,6 +18,7 @@ export function useWebRTC() {
   const [peers, setPeers] = useState<Record<string, PeerConnection>>({});
   const [isConnecting, setIsConnecting] = useState(false);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const [streamSender, setStreamSender] = useState<RTCRtpSender | null>(null);
 
   // Get current user ID helper
   const getCurrentUserId = useCallback(() => {
@@ -126,7 +127,7 @@ export function useWebRTC() {
         [targetUserId]: {
           peerId: targetUserId,
           peer: peerConnection,
-          user: targetUser,
+          user: targetUser
         },
       }));
 
@@ -243,6 +244,14 @@ export function useWebRTC() {
     }
   }, [currentRoom, peers]);
 
+  // Remove stream sender
+  const removeStream = useCallback((peerData: RTCPeerConnection) => {
+    if (streamSender) {
+      peerData.removeTrack(streamSender);
+      setStreamSender(null);
+    }
+  }, [streamSender]);
+
   // Remove peer connection
   const removePeer = useCallback((peerId: string) => {
     console.log('🔌 Removing peer:', peerId);
@@ -254,6 +263,7 @@ export function useWebRTC() {
         // Clean up peer connection - check if it's RTCPeerConnection
         const peer = peerData.peer;
         if (peer && typeof peer === 'object' && 'close' in peer && typeof peer.close === 'function') {
+          removeStream(peer as RTCPeerConnection);
           peer.close();
         }
         
@@ -267,7 +277,7 @@ export function useWebRTC() {
       const { [peerId]: _removed, ...remaining } = prevPeers;
       return remaining;
     });
-  }, []);
+  }, [removeStream]);
 
   // Set local stream
   const setLocalStream = useCallback((stream: MediaStream | null) => {
@@ -286,12 +296,13 @@ export function useWebRTC() {
         if (peer instanceof RTCPeerConnection) {
           console.log('📤 Adding tracks to existing peer:', peerData.peerId);
           stream.getTracks().forEach(track => {
-            peer.addTrack(track, stream);
+            const sender = peer.addTrack(track, stream);
+            setStreamSender(sender);
           });
         }
       });
     }
-  }, [peers]);
+  }, [peers, setStreamSender]);
 
   // Connect to all participants in room
   const connectToAllParticipants = useCallback(() => {

@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react';
-import { getUserMedia, stopMediaStream, isMediaSupported } from '@/utils/media';
+import { getUserMedia, stopMediaStream, isMediaSupported, getUserCamera, getUserAudio } from '@/utils/media';
 import type { MediaConstraints } from '@/types';
 
 export function useMedia() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
 
   /**
    * Initialize user media stream
@@ -21,24 +23,19 @@ export function useMedia() {
     setError(null);
 
     try {
-      console.log('🎥 Getting user media with constraints:', constraints);
       const stream = await getUserMedia(constraints);
-      console.log('🎥 Successfully got media stream:', !!stream);
-      console.log('🎥 Stream tracks:', stream?.getTracks().map(t => `${t.kind}: ${t.enabled}`));
       
       setLocalStream(stream);
 
       // Ensure tracks are enabled by default
-      const videoTrack = stream.getVideoTracks()[0];
-      const audioTrack = stream.getAudioTracks()[0];
+      const videoTrack = stream?.getVideoTracks()[0];
+      const audioTrack = stream?.getAudioTracks()[0];
 
       if (videoTrack) {
-        videoTrack.enabled = true;
-        console.log('📹 Video track enabled:', videoTrack.enabled);
+        videoTrack.enabled = false;
       }
       if (audioTrack) {
         audioTrack.enabled = true;
-        console.log('🎤 Audio track enabled:', audioTrack.enabled);
       }
 
       return stream;
@@ -66,34 +63,75 @@ export function useMedia() {
   /**
    * Toggle video track on/off
    */
-  const toggleVideo = useCallback((enabled?: boolean) => {
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = enabled !== undefined ? enabled : !videoTrack.enabled;
-        console.log('📹 Video track toggled:', videoTrack.enabled);
-        return videoTrack.enabled;
+  const toggleVideo = useCallback(async (enabled?: boolean) => {
+    console.log('🎤 Toggling video:', enabled);
+    const result = { newEnabled: false, error: null as string | null };
+    if (videoStream && enabled) {
+      const videoTracks = videoStream.getVideoTracks();
+
+      if (videoTracks.length > 0) {
+        videoTracks.forEach(videoTrack => {
+          videoTrack.stop();
+        });
+
+        setVideoStream(null);
+        result.newEnabled = false;
       }
+
+    } else if (!isMediaSupported()) {
+        const errorMsg = 'Your browser does not support camera';
+        result.error = errorMsg;
+    } else {
+      const { stream, error } = await getUserCamera(); // always initialize both media streams
+      
+      if (error) {
+        result.error = error;
+      } else {
+        setVideoStream(stream);
+      }
+
+      result.newEnabled = stream !== null;
     }
-    return false;
-  }, [localStream]);
+    return result;
+  }, [videoStream]);
 
   /**
    * Toggle audio track on/off
    */
-  const toggleAudio = useCallback((enabled?: boolean) => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = enabled !== undefined ? enabled : !audioTrack.enabled;
-        console.log('🎤 Audio track toggled:', audioTrack.enabled);
-        return audioTrack.enabled;
+  const toggleAudio = useCallback(async (enabled?: boolean) => {
+    const result = { newEnabled: false, error: null as string | null };
+    if (audioStream && enabled) {
+      const audioTracks = audioStream.getAudioTracks();
+
+      if (audioTracks.length > 0) {
+        audioTracks.forEach(audioTrack => {
+          audioTrack.stop();
+        });
+
+        setAudioStream(null);
+        result.newEnabled = false;
       }
+
+    } else if (!isMediaSupported()) {
+        const errorMsg = 'Your browser does not support microphone';
+        result.error = errorMsg;
+    } else {
+      const { stream, error } = await getUserAudio(); // always initialize both media streams
+
+      if (error) {
+        result.error = error;
+      } else {
+        setAudioStream(stream);
+      }
+
+      result.newEnabled = stream !== null;
     }
-    return false;
-  }, [localStream]);
+    return result;
+  }, [audioStream]);
 
   return {
+    videoStream,
+    audioStream,
     localStream,
     isLoading,
     error,

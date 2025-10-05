@@ -32,13 +32,61 @@ export const SCREEN_SHARE_CONSTRAINTS: MediaConstraints = {
  */
 export async function getUserMedia(
   constraints: MediaConstraints = DEFAULT_CONSTRAINTS
-): Promise<MediaStream> {
+): Promise<MediaStream | null> {
+  const { state: cameraState } = await navigator.permissions.query({ name: 'camera' as PermissionName });
+
+  if (cameraState === 'denied') constraints.video = false;
+
+  const { state: microphoneState } = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+
+  if (microphoneState === 'denied') constraints.audio = false;
+
+  const stream = cameraState === 'denied' && microphoneState === 'denied' ? null : await navigator.mediaDevices.getUserMedia(constraints);
+  return stream;
+}
+
+/**
+ * Get user camera stream only (video, no audio)
+ */
+export async function getUserCamera(): Promise<{ stream: MediaStream | null, error: string | null }> {
+  const result = { stream: null as MediaStream | null, error: null as string | null };
   try {
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    return stream;
+    const { state: cameraState } = await navigator.permissions.query({ name: 'camera' as PermissionName });
+
+    if (cameraState === 'denied') {
+      result.error = 'Camera access denied';
+      return result;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({ video: DEFAULT_CONSTRAINTS.video, audio: false });
+
+    result.stream = stream;
   } catch (error) {
-    console.error('Error accessing user media:', error);
-    throw new Error(getMediaErrorMessage(error as DOMException));
+    console.error('Error accessing camera stream:', error);
+    result.error = 'Failed to access camera stream';
+  }
+  return result;
+};
+
+/**
+ * Get user microphone stream only (audio, no video)
+ */
+export async function getUserAudio(): Promise<{ stream: MediaStream | null, error: string | null }> {
+  const result = { stream: null as MediaStream | null, error: null as string | null };
+  try {
+    const { state: microphoneState } = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+
+    if (microphoneState === 'denied') {
+      result.error = 'Microphone access denied';
+      return result;
+    }
+
+    result.stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: DEFAULT_CONSTRAINTS.audio });
+    return result;
+  } catch (error) {
+    console.error('Error accessing microphone stream:', error);
+    result.error = 'Failed to access microphone stream';
+    return result;
   }
 }
 
@@ -47,7 +95,6 @@ export async function getUserMedia(
  */
 export async function getScreenShare(): Promise<MediaStream> {
   try {
-    // @ts-ignore - getDisplayMedia exists but might not be in all type definitions
     const stream = await navigator.mediaDevices.getDisplayMedia(SCREEN_SHARE_CONSTRAINTS);
     return stream;
   } catch (error) {
@@ -102,7 +149,6 @@ export function isMediaSupported(): boolean {
  * Check if screen sharing is supported
  */
 export function isScreenShareSupported(): boolean {
-  // @ts-ignore - getDisplayMedia might not be in type definitions
   return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
 }
 
@@ -129,25 +175,5 @@ export async function getAvailableDevices(): Promise<{
       audioInputs: [],
       audioOutputs: [],
     };
-  }
-}
-
-/**
- * Get user-friendly error message from media errors
- */
-function getMediaErrorMessage(error: DOMException): string {
-  switch (error.name) {
-    case 'NotFoundError':
-      return 'No camera or microphone found. Please connect a device and try again.';
-    case 'NotAllowedError':
-      return 'Camera and microphone access denied. Please allow permissions and try again.';
-    case 'NotReadableError':
-      return 'Camera or microphone is already in use by another application.';
-    case 'OverconstrainedError':
-      return 'Camera or microphone does not meet the required constraints.';
-    case 'SecurityError':
-      return 'Media access denied due to security restrictions.';
-    default:
-      return 'Failed to access camera or microphone. Please check your device and try again.';
   }
 }

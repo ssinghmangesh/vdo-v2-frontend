@@ -63,18 +63,11 @@ export interface CallState {
 }
 
 export interface SocketEvents {
-  'user-joined': (user: User) => void;
-  'user-left': (userId: string) => void;
-  'receive-call': (data: { signal: WebRTCSignal; from: string; user: User }) => void;
-  'call-accepted': (data: { signal: WebRTCSignal; from: string }) => void;
-  'call-ended': () => void;
-  'room-update': (room: Room) => void;
+  'room:user-left': (data: {userId: string}) => void;
   'room:joined': (room: Room) => void;
   'room:user-joined': (room: RoomUserJoined) => void;
   'error': (error: { message: string; code?: string }) => void;
   'room:created': (room: Room) => void;
-  'participant-kicked': (participantId: string) => void;
-  'host-transferred': (data: { newHostId: string; newHost: User }) => void;
   // WebRTC Signaling Events
   'webrtc:offer': (data: { from: string; offer: RTCSessionDescriptionInit; roomId: string }) => void;
   'webrtc:answer': (data: { from: string; answer: RTCSessionDescriptionInit; roomId: string }) => void;

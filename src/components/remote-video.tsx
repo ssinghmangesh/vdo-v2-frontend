@@ -26,13 +26,17 @@ export function RemoteVideo({
   const [isMuted, setIsMuted] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
+  console.log('🔍 Remote Video:', { peerId, user, stream, className, onVolumeToggle });
+
   // Set up video stream
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+    if (peerId) {
       setConnectionStatus('connected');
     }
-  }, [stream]);
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [peerId, stream]);
 
   // Monitor track status
   useEffect(() => {
@@ -134,7 +138,7 @@ export function RemoteVideo({
               )}
             </div>
             <p className="text-sm text-gray-300">
-              {isVideoEnabled ? 'No video' : 'Camera off'}
+              {/* Video will render here */}
             </p>
           </div>
         </div>

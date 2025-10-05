@@ -42,6 +42,7 @@ export const useRoomStore = create<RoomState & RoomActions>((set, get) => ({
 
   addParticipant: (user: User) => {
     const currentRoom = get().currentRoom;
+    console.log('✅ Adding participant:', user, currentRoom);
     if (!currentRoom) return;
 
     // Check if participant already exists
@@ -49,6 +50,8 @@ export const useRoomStore = create<RoomState & RoomActions>((set, get) => ({
       const participantId = 'userId' in participant ? participant.userId : participant.id;
       return participantId === user.id;
     });
+
+    console.log('✅ Is already participant:', isAlreadyParticipant);
 
     if (!isAlreadyParticipant) {
       set((state) => {

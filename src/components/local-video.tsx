@@ -19,25 +19,18 @@ export function LocalVideo({
   showControls = true, 
   muted = true,
   stream,
-  videoEnabled = true,
-  audioEnabled = true
+  videoEnabled = false,
+  audioEnabled = false
 }: LocalVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const { user } = useAuthStore();
 
-  console.log('🎥 Local video stream:', stream);
-  console.log('🎥 Video enabled:', videoEnabled);
-  console.log('🎥 Audio enabled:', audioEnabled);
-
   // Set up video stream
   useEffect(() => {
     if (videoRef.current && stream) {
-      console.log('🎥 Setting up local video stream');
       videoRef.current.srcObject = stream;
     }
   }, [stream]);
-
-  // Use props for media state
 
   return (
     <div className={cn(
@@ -63,7 +56,7 @@ export function LocalVideo({
               </span>
             </div>
             <p className="text-sm text-gray-300">
-              {stream ? (videoEnabled ? 'No video' : 'Camera off') : 'Initializing...'}
+              {stream ? (videoEnabled ? 'No video' : 'Camera off') : 'Required permissions'}
             </p>
           </div>
         </div>
